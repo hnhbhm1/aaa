@@ -19,14 +19,25 @@ function saveDollarRate(rate) {
     dollarRate = rate;
 }
 
-// تنسيق السعر
-function formatPrice(price) {
-    return Number(price).toFixed(2);
+// استخراج أقل كمية من المنتج (min)
+function getMinQty(product) {
+    // إذا كانت qty_values كائنًا وله خاصية min
+    if (product.qty_values && typeof product.qty_values === 'object' && !Array.isArray(product.qty_values)) {
+        const min = parseFloat(product.qty_values.min);
+        if (!isNaN(min) && min > 0) return min;
+    }
+    // إذا كانت qty_values مصفوفة أو null أو لا يوجد min، نرجع 1
+    return 1;
 }
 
-// حساب السعر بالدولار
-function getDollarPrice(price) {
-    return (price / dollarRate).toFixed(2);
+// حساب السعر بالدولار حسب المعادلة: (price * min) / dollarRate / min
+function getDollarPrice(product) {
+    const priceNum = parseFloat(product.price) || 0;
+    const minQty = getMinQty(product);
+    // المعادلة كما طلبت: (price * min) / rate / min
+    const dollarPrice = (priceNum * minQty) / dollarRate / minQty;
+    // إرجاع الرقم بعدد كافٍ من المنازل العشرية (حتى 10)
+    return dollarPrice.toFixed(10);
 }
 
 // عرض إشعار نسخ
@@ -72,15 +83,15 @@ function displayProducts(productsToShow) {
 
     container.innerHTML = productsToShow.map(prod => {
         const img = prod.category_img || 'https://via.placeholder.com/300x160?text=No+Image';
-        const priceNum = parseFloat(prod.price) || 0;
+        const originalPrice = prod.price; // نحتفظ بالقيمة الأصلية كما هي
         return `
             <div class="product-card" data-id="${prod.id}">
                 <img src="${img}" alt="${prod.name}" class="card-img" loading="lazy">
                 <div class="card-content">
                     <h3>${prod.name}</h3>
                     <div class="card-price">
-                        <span class="original-price">${formatPrice(priceNum)}</span>
-                        <span class="dollar-price">$${getDollarPrice(priceNum)}</span>
+                        <span class="original-price">${originalPrice}</span>
+                        <span class="dollar-price">$${getDollarPrice(prod)}</span>
                     </div>
                 </div>
             </div>
@@ -119,16 +130,18 @@ async function showProductDetail() {
 
     // تجهيز البيانات
     const img = product.category_img || 'https://via.placeholder.com/300x300?text=No+Image';
-    const priceNum = parseFloat(product.price) || 0;
     const availableText = product.available ? 'متوفر' : 'غير متوفر';
     const availableClass = product.available ? 'available' : 'unavailable';
+
+    // حساب السعر بالدولار باستخدام الدالة المعدلة
+    const dollarPrice = getDollarPrice(product);
 
     // إنشاء حقول قابلة للنسخ
     const fields = [
         { label: 'ID', value: product.id },
         { label: 'الاسم', value: product.name },
-        { label: 'السعر', value: formatPrice(priceNum) },
-        { label: 'السعر بالدولار', value: `$${getDollarPrice(priceNum)}` },
+        { label: 'السعر', value: product.price.toString() }, // السعر الأصلي كامل
+        { label: 'السعر بالدولار', value: dollarPrice },
         { label: 'المعاملات (params)', value: product.params ? product.params.join('، ') : '—' },
         { label: 'اسم التصنيف', value: product.category_name },
         { label: 'الحالة', value: availableText },
